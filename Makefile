@@ -11,7 +11,7 @@ $(APP): $(BIN) Info.plist
 	mkdir -p $(APP)/Contents/MacOS
 	cp $(BIN) $(APP)/Contents/MacOS/
 	cp Info.plist $(APP)/Contents/
-	codesign --force --sign - $(APP)
+	codesign --force --sign "Launcher Dev" $(APP)
 
 run: $(APP)
 	pkill -x Launcher || true

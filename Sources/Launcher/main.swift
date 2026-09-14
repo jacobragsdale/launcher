@@ -8,12 +8,18 @@ import ServiceManagement
     func applicationDidFinishLaunching(_: Notification) {
         if Bundle.main.bundlePath.hasPrefix("/Applications/") { try? SMAppService.mainApp.register() }
 
-        var hotKey: EventHotKeyRef?
-        RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey), EventHotKeyID(signature: 0x4C4E4348, id: 1),
-                            GetApplicationEventTarget(), 0, &hotKey)
+        for (id, key, mods) in [(1, kVK_Space, cmdKey), (2, kVK_LeftArrow, cmdKey), (3, kVK_RightArrow, cmdKey), (4, kVK_UpArrow, cmdKey),
+                                (5, kVK_UpArrow, cmdKey | shiftKey), (6, kVK_DownArrow, cmdKey | shiftKey)] {
+            var hotKey: EventHotKeyRef?
+            RegisterEventHotKey(UInt32(key), UInt32(mods), EventHotKeyID(signature: 0x4C4E4348, id: UInt32(id)),
+                                GetApplicationEventTarget(), 0, &hotKey)
+        }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-            MainActor.assumeIsolated { (NSApp.delegate as! AppDelegate).panel.toggle() }
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+            var hk = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              nil, MemoryLayout<EventHotKeyID>.size, nil, &hk)
+            MainActor.assumeIsolated { hk.id == 1 ? (NSApp.delegate as! AppDelegate).panel.toggle() : Snap.apply(hk.id) }
             return noErr
         }, 1, &spec, nil, nil)
     }
