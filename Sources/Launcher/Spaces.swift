@@ -12,12 +12,11 @@ enum Spaces {
         typealias Displays = @convention(c) (Int32) -> Unmanaged<CFArray>
         typealias SetSpace = @convention(c) (Int32, CFString, UInt64) -> Void
         typealias Windows = @convention(c) (Int32, UInt32, CFArray, UInt32, UnsafeMutablePointer<UInt64>, UnsafeMutablePointer<UInt64>) -> Unmanaged<CFArray>?
-        typealias Owner = @convention(c) (Int32, UInt32, UnsafeMutablePointer<Int32>) -> Int32
         let sky = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_NOW)
         func sym<T>(_ name: String, _: T.Type) -> T? { dlsym(sky, name).map { unsafeBitCast($0, to: T.self) } }
         guard let connection = sym("SLSMainConnectionID", Conn.self), let activeSpace = sym("SLSGetActiveSpace", Active.self),
               let displays = sym("SLSCopyManagedDisplaySpaces", Displays.self), let setSpace = sym("SLSManagedDisplaySetCurrentSpace", SetSpace.self),
-              let windows = sym("SLSCopyWindowsWithOptionsAndTags", Windows.self), let owner = sym("SLSGetWindowOwner", Owner.self) else { return }
+              let windows = sym("SLSCopyWindowsWithOptionsAndTags", Windows.self) else { return }
         let conn = connection(), current = activeSpace(conn)
         guard let display = (displays(conn).takeRetainedValue() as? [[String: Any]])?
                   .first(where: { ($0["Spaces"] as? [[String: Any]])?.contains { $0["ManagedSpaceID"] as? UInt64 == current } == true }),
@@ -26,10 +25,16 @@ enum Spaces {
               let i = spaces.firstIndex(of: current), spaces.indices.contains(target(i)), target(i) != i else { return }
         let target = spaces[target(i)]
         setSpace(conn, uuid as CFString, target)
-        // Focus follows: activate whoever owns the first window on the target space.
-        var set: UInt64 = 0, clear: UInt64 = 0, pid: Int32 = 0
-        if let wid = (windows(conn, 0, [target] as CFArray, 2, &set, &clear)?.takeRetainedValue() as? [UInt32])?.first, owner(conn, wid, &pid) == 0 {
-            NSRunningApplication(processIdentifier: pid)?.activate()
+        // Focus follows: the window server's per-space list says which windows are there, the public all-windows list gives
+        // z-order; activate the app of the frontmost normal, visible window on the target space, unless that app is hidden.
+        var set: UInt64 = 0, clear: UInt64 = 0
+        let onTarget = Set((windows(conn, 0, [target] as CFArray, 2, &set, &clear)?.takeRetainedValue() as? [UInt32]) ?? [])
+        let front = (CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]])?.first {
+            onTarget.contains($0[kCGWindowNumber as String] as? UInt32 ?? 0) && $0[kCGWindowLayer as String] as? Int == 0
+                && ($0[kCGWindowAlpha as String] as? Double ?? 0) > 0
+        }
+        if let pid = front?[kCGWindowOwnerPID as String] as? Int32, let app = NSRunningApplication(processIdentifier: pid), !app.isHidden {
+            app.activate()
         }
     }
 }
