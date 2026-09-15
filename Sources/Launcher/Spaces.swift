@@ -3,7 +3,10 @@ import AppKit
 /// Space switching through SkyLight's private API: instant, no slide animation. The Dock isn't told, so the next
 /// three-finger swipe or Mission Control may start from a stale idea of the current space once, then resync.
 enum Spaces {
-    @MainActor static func move(_ delta: Int) {
+    @MainActor static func move(_ delta: Int) { move { $0 + delta } }
+    @MainActor static func move(to index: Int) { move { _ in index } }
+
+    @MainActor private static func move(_ target: (Int) -> Int) {
         typealias Conn = @convention(c) () -> Int32
         typealias Active = @convention(c) (Int32) -> UInt64
         typealias Displays = @convention(c) (Int32) -> Unmanaged<CFArray>
@@ -20,8 +23,8 @@ enum Spaces {
                   .first(where: { ($0["Spaces"] as? [[String: Any]])?.contains { $0["ManagedSpaceID"] as? UInt64 == current } == true }),
               let uuid = display["Display Identifier"] as? String,
               let spaces = (display["Spaces"] as? [[String: Any]])?.compactMap({ $0["ManagedSpaceID"] as? UInt64 }),
-              let i = spaces.firstIndex(of: current), spaces.indices.contains(i + delta) else { return }
-        let target = spaces[i + delta]
+              let i = spaces.firstIndex(of: current), spaces.indices.contains(target(i)), target(i) != i else { return }
+        let target = spaces[target(i)]
         setSpace(conn, uuid as CFString, target)
         // Focus follows: activate whoever owns the first window on the target space.
         var set: UInt64 = 0, clear: UInt64 = 0, pid: Int32 = 0
