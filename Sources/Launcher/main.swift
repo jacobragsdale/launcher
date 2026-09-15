@@ -22,7 +22,7 @@ import ServiceManagement
             var hk = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                               nil, MemoryLayout<EventHotKeyID>.size, nil, &hk)
-            MainActor.assumeIsolated { hk.id == 1 ? (NSApp.delegate as! AppDelegate).panel.toggle() : hk.id >= 11 ? Spaces.move(to: Int(hk.id) - 11) : hk.id >= 7 ? Spaces.move(hk.id == 7 ? -1 : 1) : Snap.apply(hk.id) }
+            MainActor.assumeIsolated { hk.id == 1 ? (NSApp.delegate as! AppDelegate).panel.toggle() : hk.id >= 11 ? Workspaces.move(to: Int(hk.id) - 11) : hk.id >= 7 ? Workspaces.move(hk.id == 7 ? -1 : 1) : Snap.apply(hk.id) }
             return noErr
         }, 1, &spec, nil, nil)
     }
