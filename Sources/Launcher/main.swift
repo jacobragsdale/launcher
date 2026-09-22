@@ -28,6 +28,10 @@ import ServiceManagement
     }
 }
 
+// Apps opened via NSWorkspace inherit this process's env; a `make install` from a herdr/Claude shell would
+// otherwise leak HERDR_ENV/CLAUDE_CODE_CHILD_SESSION into every Ghostty launched from here.
+for k in ProcessInfo.processInfo.environment.keys where k.hasPrefix("HERDR_") || k.hasPrefix("CLAUDE") || k == "AI_AGENT" { unsetenv(k) }
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 let delegate = AppDelegate()
