@@ -23,6 +23,8 @@ enum Workspaces {
         })
         return NSWorkspace.shared.runningApplications
             .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != "com.apple.finder" && windowed.contains($0.processIdentifier) }
-            .sorted { ($0.launchDate ?? .distantPast) < ($1.launchDate ?? .distantPast) }
+            .map { ($0, $0.launchDate ?? .distantPast) } // each launchDate is an IPC; don't redo it per sort comparison
+            .sorted { $0.1 < $1.1 }
+            .map(\.0)
     }
 }

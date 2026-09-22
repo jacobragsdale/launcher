@@ -1,10 +1,10 @@
 import AppKit
 
-struct App: Identifiable, Hashable, Sendable {
+struct App: Hashable, Sendable {
     let url: URL
     let name: String
     var uses = 0
-    var id: URL { url }
+    var icon: CGImage? = nil
 }
 
 enum Apps {
@@ -14,8 +14,10 @@ enum Apps {
     ].map { URL(fileURLWithPath: $0) }
 
     // ponytail: rescan-on-show, add NSMetadataQuery if apps in deeper folders are ever missed
-    nonisolated static func scan() -> [App] {
+    /// Icons are rendered here, off the main thread, and carried over from `old` so a rescan only draws new apps.
+    nonisolated static func scan(reusing old: [App], appearance: NSAppearance.Name) -> [App] {
         let fm = FileManager.default
+        let icons = Dictionary(old.map { ($0.url, $0.icon) }) { a, _ in a }
         var seen = Set<URL>()
         var out: [App] = []
         func visit(_ dir: URL, depth: Int) {
@@ -24,8 +26,8 @@ enum Apps {
                 if url.pathExtension == "app" {
                     if seen.insert(url.resolvingSymlinksInPath()).inserted {
                         // macOS counts launches from anywhere (Dock, Finder, us), so ranking works from day one
-                        let uses = NSMetadataItem(url: url)?.value(forAttribute: "kMDItemUseCount") as? Int ?? 0
-                        out.append(App(url: url, name: fm.displayName(atPath: url.path), uses: uses))
+                        let uses = MDItemCreateWithURL(nil, url as CFURL).flatMap { MDItemCopyAttribute($0, "kMDItemUseCount" as CFString) as? Int } ?? 0
+                        out.append(App(url: url, name: fm.displayName(atPath: url.path), uses: uses, icon: icons[url] ?? render(url, appearance)))
                     }
                 } else if depth < 1, (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
                     visit(url, depth: depth + 1)
@@ -66,11 +68,16 @@ enum Apps {
         NSWorkspace.shared.openApplication(at: app.url, configuration: .init())
     }
 
-    @MainActor private static var icons: [URL: NSImage] = [:]
-    @MainActor static func icon(_ app: App) -> NSImage {
-        if let i = icons[app.url] { return i }
-        let i = NSWorkspace.shared.icon(forFile: app.url.path)
-        icons[app.url] = i
-        return i
+    /// 32pt @2x bitmap: the system icon is lazily drawn at up to 1024px, ~12ms each cold, which stalls scrolling on main.
+    nonisolated static func render(_ url: URL, _ appearance: NSAppearance.Name) -> CGImage? {
+        let image = NSWorkspace.shared.icon(forFile: url.path)
+        guard let ctx = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else { return nil }
+        NSAppearance(named: appearance)?.performAsCurrentDrawingAppearance {
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+            image.draw(in: CGRect(x: 0, y: 0, width: 64, height: 64))
+            NSGraphicsContext.current = nil
+        }
+        return ctx.makeImage()
     }
 }

@@ -6,7 +6,7 @@ import ServiceManagement
     let panel = Panel()
 
     func applicationDidFinishLaunching(_: Notification) {
-        if Bundle.main.bundlePath.hasPrefix("/Applications/") { try? SMAppService.mainApp.register() }
+        if Bundle.main.bundlePath.hasPrefix("/Applications/") { Task.detached { try? SMAppService.mainApp.register() } } // XPC round trip; keep it off launch
 
         let digits = [kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3, kVK_ANSI_4, kVK_ANSI_5, kVK_ANSI_6, kVK_ANSI_7, kVK_ANSI_8, kVK_ANSI_9]
         for (id, key, mods) in [(1, kVK_Space, cmdKey), (2, kVK_LeftArrow, cmdKey), (3, kVK_RightArrow, cmdKey), (4, kVK_UpArrow, cmdKey),

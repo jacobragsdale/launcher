@@ -2,11 +2,21 @@ import AppKit
 import SwiftUI
 
 @MainActor @Observable final class SearchModel {
-    var query = ""
+    var query = "" { didSet { selected = 0; results = Apps.matches(query, in: apps) } }
     var selected = 0
-    var apps: [App] = []
-    var onOpen: () -> Void = {}
-    var results: [App] { Apps.matches(query, in: apps) }
+    var apps: [App] = [] { didSet { results = Apps.matches(query, in: apps) } }
+    private(set) var results: [App] = []
+    @ObservationIgnored var onOpen: () -> Void = {}
+    @ObservationIgnored private var iconAppearance: NSAppearance.Name?
+
+    /// Assigns only on change, so the usual rescan (nothing installed, no launches counted) costs the UI nothing.
+    // ponytail: icon style changes (tinted/clear) keep old icons until relaunch; hook the setting's notification if that bites
+    func refresh() async {
+        let appearance = NSApp.effectiveAppearance.name, old = appearance == iconAppearance ? apps : []
+        let new = await Task.detached { Apps.scan(reusing: old, appearance: appearance) }.value
+        iconAppearance = appearance
+        if new != apps { apps = new }
+    }
 
     func move(_ d: Int) {
         let n = results.count
@@ -43,35 +53,43 @@ struct SearchView: View {
                 Divider()
                 ScrollViewReader { proxy in
                     ScrollView {
+                        // Rows are identified by position: typing refills the same rows instead of diffing inserts and removals
                         LazyVStack(spacing: 2) {
-                            ForEach(Array(results.enumerated()), id: \.element.id) { i, app in
-                                HStack(spacing: 12) {
-                                    Image(nsImage: Apps.icon(app)).resizable().frame(width: 32, height: 32)
-                                    Text(app.name).font(.system(size: 16))
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 12).padding(.vertical, 6)
-                                .background(i == model.selected ? Color.accentColor.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 8))
-                                .contentShape(Rectangle())
-                                .onTapGesture { model.selected = i; model.open() }
+                            ForEach(results.indices, id: \.self) { i in
+                                Row(app: results[i], selected: i == model.selected)
+                                    .onTapGesture { model.selected = i; model.open() }
                             }
                         }
                         .padding(8)
                     }
                     // 44pt rows + 2pt gaps; the half row peeking out says "scroll me"
                     .frame(height: min(CGFloat(results.count), 8.5) * 46 + 14)
-                    .onChange(of: model.selected) {
-                        let r = model.results
-                        if r.indices.contains(model.selected) { proxy.scrollTo(r[model.selected].id) }
-                    }
+                    .onChange(of: model.selected) { proxy.scrollTo(model.selected) }
                 }
             }
         }
         .frame(width: 640)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
+        // Behind the content, not wrapping it: wrapped, the glass re-processed the list on every show, keystroke and scroll
+        .background { Color.clear.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20)) }
         .frame(maxHeight: .infinity, alignment: .top)
-        .onChange(of: model.query) { model.selected = 0 }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in focused = true }
+    }
+}
+
+/// Its own view so an arrow key re-renders just the two rows whose `selected` flipped.
+struct Row: View {
+    let app: App
+    let selected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let icon = app.icon { Image(decorative: icon, scale: 2) } else { Color.clear.frame(width: 32, height: 32) }
+            Text(app.name).font(.system(size: 16))
+            Spacer()
+        }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(selected ? Color.accentColor.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(Rectangle())
     }
 }
 
@@ -89,6 +107,7 @@ final class Panel: NSPanel {
         isMovableByWindowBackground = true
         model.onOpen = { [weak self] in self?.hide() }
         contentView = NSHostingView(rootView: SearchView(model: model, hide: { [weak self] in self?.hide() }))
+        Task { await model.refresh(); prewarm() }
         NotificationCenter.default.addObserver(self, selector: #selector(hide), name: NSWindow.didResignKeyNotification, object: self)
     }
 
@@ -104,11 +123,20 @@ final class Panel: NSPanel {
 
     @objc func hide() { orderOut(nil) }
 
+    /// Pays the first show's one-time cost (window surface, SwiftUI's first layout of the list) at launch, invisibly.
+    private func prewarm() {
+        guard !isVisible else { return }
+        alphaValue = 0
+        orderFrontRegardless()
+        displayIfNeeded()
+        orderOut(nil)
+        alphaValue = 1
+    }
+
     func toggle() {
         if isKeyWindow { return hide() }
-        model.query = ""
-        model.selected = 0
-        Task { model.apps = await Task.detached { Apps.scan() }.value }
+        model.query = "" // didSet also resets the selection
+        Task { await model.refresh() }
         let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
         if let f = screen?.visibleFrame {
             setFrameOrigin(.init(x: f.midX - frame.width / 2, y: f.maxY - f.height * 0.2 - frame.height))
