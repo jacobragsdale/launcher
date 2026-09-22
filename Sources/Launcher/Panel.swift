@@ -41,20 +41,30 @@ struct SearchView: View {
             let results = model.results
             if !results.isEmpty {
                 Divider()
-                VStack(spacing: 2) {
-                    ForEach(Array(results.enumerated()), id: \.element.id) { i, app in
-                        HStack(spacing: 12) {
-                            Image(nsImage: Apps.icon(app)).resizable().frame(width: 32, height: 32)
-                            Text(app.name).font(.system(size: 16))
-                            Spacer()
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 2) {
+                            ForEach(Array(results.enumerated()), id: \.element.id) { i, app in
+                                HStack(spacing: 12) {
+                                    Image(nsImage: Apps.icon(app)).resizable().frame(width: 32, height: 32)
+                                    Text(app.name).font(.system(size: 16))
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(i == model.selected ? Color.accentColor.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 8))
+                                .contentShape(Rectangle())
+                                .onTapGesture { model.selected = i; model.open() }
+                            }
                         }
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(i == model.selected ? Color.accentColor.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 8))
-                        .contentShape(Rectangle())
-                        .onTapGesture { model.selected = i; model.open() }
+                        .padding(8)
+                    }
+                    // 44pt rows + 2pt gaps; the half row peeking out says "scroll me"
+                    .frame(height: min(CGFloat(results.count), 8.5) * 46 + 14)
+                    .onChange(of: model.selected) {
+                        let r = model.results
+                        if r.indices.contains(model.selected) { proxy.scrollTo(r[model.selected].id) }
                     }
                 }
-                .padding(8)
             }
         }
         .frame(width: 640)
@@ -69,7 +79,7 @@ final class Panel: NSPanel {
     let model = SearchModel()
 
     init() {
-        super.init(contentRect: .init(x: 0, y: 0, width: 640, height: 440),
+        super.init(contentRect: .init(x: 0, y: 0, width: 640, height: 480),
                    styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
                    backing: .buffered, defer: false)
         level = .floating

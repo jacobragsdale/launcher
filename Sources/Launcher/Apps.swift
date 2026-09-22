@@ -3,6 +3,7 @@ import AppKit
 struct App: Identifiable, Hashable, Sendable {
     let url: URL
     let name: String
+    var uses = 0
     var id: URL { url }
 }
 
@@ -22,7 +23,9 @@ enum Apps {
             for url in items {
                 if url.pathExtension == "app" {
                     if seen.insert(url.resolvingSymlinksInPath()).inserted {
-                        out.append(App(url: url, name: fm.displayName(atPath: url.path)))
+                        // macOS counts launches from anywhere (Dock, Finder, us), so ranking works from day one
+                        let uses = NSMetadataItem(url: url)?.value(forAttribute: "kMDItemUseCount") as? Int ?? 0
+                        out.append(App(url: url, name: fm.displayName(atPath: url.path), uses: uses))
                     }
                 } else if depth < 1, (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
                     visit(url, depth: depth + 1)
@@ -52,21 +55,14 @@ enum Apps {
         return 3
     }
 
-    nonisolated static var counts: [String: Int] {
-        get { UserDefaults.standard.dictionary(forKey: "counts") as? [String: Int] ?? [:] }
-        set { UserDefaults.standard.set(newValue, forKey: "counts") }
-    }
-
     nonisolated static func matches(_ query: String, in apps: [App]) -> [App] {
-        let counts = counts
-        return apps
-            .compactMap { app in score(query: query, name: app.name).map { (app, $0, -counts[app.url.path, default: 0]) } }
-            .sorted { ($0.1, $0.2, $0.0.name) < ($1.1, $1.2, $1.0.name) }
-            .prefix(8).map(\.0)
+        apps
+            .compactMap { app in score(query: query, name: app.name).map { (app, $0) } }
+            .sorted { ($0.1, -$0.0.uses, $0.0.name) < ($1.1, -$1.0.uses, $1.0.name) }
+            .map(\.0)
     }
 
     @MainActor static func open(_ app: App) {
-        counts[app.url.path, default: 0] += 1
         NSWorkspace.shared.openApplication(at: app.url, configuration: .init())
     }
 

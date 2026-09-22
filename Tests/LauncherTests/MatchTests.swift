@@ -10,4 +10,11 @@ final class MatchTests: XCTestCase {
         XCTAssertNil(Apps.score(query: "xyz", name: "Safari"))
         XCTAssertEqual(Apps.score(query: "Éa", name: "eA"), 0)
     }
+
+    func testRanking() {
+        let app = { (n: String, u: Int) in App(url: URL(fileURLWithPath: "/\(n).app"), name: n, uses: u) }
+        let apps = [app("Alpha", 0), app("Safari", 5), app("Slack", 50), app("Zed", 90)]
+        XCTAssertEqual(Apps.matches("", in: apps).map(\.name), ["Zed", "Slack", "Safari", "Alpha"])
+        XCTAssertEqual(Apps.matches("s", in: apps).map(\.name), ["Slack", "Safari"])
+    }
 }
