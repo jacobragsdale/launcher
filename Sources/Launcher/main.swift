@@ -12,7 +12,7 @@ import ServiceManagement
         for (id, key, mods) in [(1, kVK_Space, cmdKey), (2, kVK_LeftArrow, cmdKey), (3, kVK_RightArrow, cmdKey), (4, kVK_UpArrow, cmdKey),
                                 (5, kVK_UpArrow, cmdKey | shiftKey), (6, kVK_DownArrow, cmdKey | shiftKey),
                                 (7, kVK_LeftArrow, cmdKey | shiftKey), (8, kVK_RightArrow, cmdKey | shiftKey)]
-                                + digits.enumerated().map { (11 + $0.offset, $0.element, cmdKey) } { // 11...19: Cmd+1...9 jump to a space
+                                + digits.enumerated().map { (11 + $0.offset, $0.element, cmdKey) } { // 11...19: Cmd+1...9 jump to a workspace
             var hotKey: EventHotKeyRef?
             RegisterEventHotKey(UInt32(key), UInt32(mods), EventHotKeyID(signature: 0x4C4E4348, id: UInt32(id)),
                                 GetApplicationEventTarget(), 0, &hotKey)
