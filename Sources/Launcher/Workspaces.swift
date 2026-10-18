@@ -4,7 +4,7 @@ import AppKit
 /// through the Dock's animation. Workspace N is the Nth regular app with a real window, in launch order, so an app
 /// keeps its number while it runs. Fill windows with Cmd+Up. Pinned apps come first and always hold their number.
 enum Workspaces {
-    static let pinned = ["org.mozilla.firefox", "com.mitchellh.ghostty", "com.citrix.receiver.icaviewer.mac"] // Cmd+1, Cmd+2, Cmd+3; launched if not running
+    static let pinned = ["org.mozilla.firefox", "com.mitchellh.ghostty", "com.citrix.receiver.icaviewer.mac", "dev.zed.Zed"] // Cmd+1 … Cmd+4; launched if not running
 
 
     @MainActor static func move(_ delta: Int) {
