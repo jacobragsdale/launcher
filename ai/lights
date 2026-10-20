@@ -1,0 +1,9 @@
+#!/bin/bash
+# Every Hue light at once, through https://lights.ragsdale.dev (github.com/jacobragsdale/lights).
+#   lights                  current state as JSON
+#   lights '<json>'         change, e.g. '{"on":true,"brightness":60,"mirek":370}'
+set -euo pipefail
+api=https://lights.ragsdale.dev/api
+if [[ $# -eq 0 ]]; then curl -fsS -m 10 "$api/state"; echo; exit; fi
+curl -fsS -m 30 -X PUT -H 'Content-Type: application/json' -d "$1" "$api/lights"
+echo ok

@@ -4,6 +4,8 @@ import ServiceManagement
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     let panel = Panel()
+    var doubleTap = DoubleTap()
+    var tap: CFMachPort?
 
     func applicationDidFinishLaunching(_: Notification) {
         if Bundle.main.bundlePath.hasPrefix("/Applications/") { Task.detached { try? SMAppService.mainApp.register() } } // XPC round trip; keep it off launch
@@ -25,6 +27,19 @@ import ServiceManagement
             MainActor.assumeIsolated { hk.id == 1 ? (NSApp.delegate as! AppDelegate).panel.toggle() : hk.id >= 11 ? Workspaces.move(to: Int(hk.id) - 11) : hk.id >= 7 ? Workspaces.move(hk.id == 7 ? -1 : 1) : Snap.apply(hk.id) }
             return noErr
         }, 1, &spec, nil, nil)
+
+        // Modifier-only, so no Carbon hotkey can express it. An active tap (it passes every event through untouched) needs
+        // only the Accessibility trust Snap asks for; a listen-only tap or NSEvent monitor would also need Input Monitoring.
+        let mask = CGEventMask(1 << CGEventType.flagsChanged.rawValue | 1 << CGEventType.keyDown.rawValue)
+        tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap, eventsOfInterest: mask, callback: { _, type, event, _ in
+            MainActor.assumeIsolated {
+                let me = NSApp.delegate as! AppDelegate
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { me.tap.map { CGEvent.tapEnable(tap: $0, enable: true) } }
+                else if me.doubleTap.feed(type, event) { me.panel.toggle(ai: true) }
+            }
+            return .passUnretained(event)
+        }, userInfo: nil)
+        tap.map { CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, $0, 0), .commonModes) }
     }
 }
 

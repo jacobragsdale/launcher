@@ -6,11 +6,13 @@ all: $(APP)
 $(BIN): Package.swift $(wildcard Sources/Launcher/*.swift)
 	swift build -c release
 
-$(APP): $(BIN) Info.plist
+$(APP): $(BIN) Info.plist $(wildcard ai/*)
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS
 	cp $(BIN) $(APP)/Contents/MacOS/
 	cp Info.plist $(APP)/Contents/
+	mkdir -p $(APP)/Contents/Resources
+	cp -R ai $(APP)/Contents/Resources/
 	codesign --force --sign "Launcher Dev" $(APP)
 
 run: $(APP)

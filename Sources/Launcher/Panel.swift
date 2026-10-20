@@ -4,6 +4,8 @@ import SwiftUI
 @MainActor @Observable final class SearchModel {
     var query = "" { didSet { selected = 0; results = Apps.matches(query, in: apps) } }
     var selected = 0
+    var ai = false // double-tap Cmd: the text goes to Claude instead of matching apps
+    var reply: String?
     var apps: [App] = [] { didSet { results = Apps.matches(query, in: apps) } }
     private(set) var results: [App] = []
     @ObservationIgnored var onOpen: () -> Void = {}
@@ -25,10 +27,18 @@ import SwiftUI
     }
 
     func open() {
+        if ai { return ask() }
         let r = results
         guard r.indices.contains(selected) else { return }
         Apps.open(r[selected])
         onOpen()
+    }
+
+    func ask() {
+        let request = query
+        guard !request.isEmpty else { return }
+        reply = "…"
+        Task { reply = await Claude.ask(request) }
     }
 }
 
@@ -39,7 +49,7 @@ struct SearchView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TextField("Search apps", text: $model.query)
+            TextField(model.ai ? "Ask Claude" : "Search apps", text: $model.query)
                 .textFieldStyle(.plain)
                 .font(.system(size: 22, weight: .light))
                 .padding(16)
@@ -48,7 +58,12 @@ struct SearchView: View {
                 .onKeyPress(.downArrow) { model.move(1); return .handled }
                 .onKeyPress(.upArrow) { model.move(-1); return .handled }
                 .onKeyPress(.escape) { hide(); return .handled }
-            let results = model.results
+            let results = model.ai ? [] : model.results
+            if model.ai, let reply = model.reply {
+                Divider()
+                Text(reply).font(.system(size: 16)).textSelection(.enabled)
+                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            }
             if !results.isEmpty {
                 Divider()
                 ScrollViewReader { proxy in
@@ -133,8 +148,10 @@ final class Panel: NSPanel {
         alphaValue = 1
     }
 
-    func toggle() {
-        if isKeyWindow { return hide() }
+    func toggle(ai: Bool = false) {
+        if isKeyWindow, model.ai == ai { return hide() }
+        model.ai = ai
+        model.reply = nil
         model.query = "" // didSet also resets the selection
         Task { await model.refresh() }
         let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
