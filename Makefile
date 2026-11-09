@@ -1,5 +1,7 @@
 APP = build/Launcher.app
 BIN = .build/release/Launcher
+# herdr kills every process carrying its pane's HC_SCOPE when the pane's holder dies, and open passes the env through
+OPEN = env -u HC_SCOPE -u HC_TERMINAL_ID -u HC_TERMINAL_SOCKET open
 
 all: $(APP)
 
@@ -17,13 +19,13 @@ $(APP): $(BIN) Info.plist $(wildcard ai/*)
 
 run: $(APP)
 	pkill -x Launcher || true
-	open $(APP)
+	$(OPEN) $(APP)
 
 install: $(APP)
 	pkill -x Launcher || true
 	rm -rf /Applications/Launcher.app
 	cp -R $(APP) /Applications/
-	open /Applications/Launcher.app
+	$(OPEN) /Applications/Launcher.app
 
 test:
 	swift test
