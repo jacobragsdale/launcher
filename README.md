@@ -4,7 +4,7 @@ Cmd+Space, type, Enter. Opens apps. Nothing else.
 
 Setup (once): System Settings → Keyboard → Keyboard Shortcuts → Spotlight → uncheck "Show Spotlight search", otherwise Spotlight takes Cmd+Space.
 
-    make install   # builds, copies to /Applications, opens; registers itself as a login item
+    make install   # builds, copies to /Applications, loads a LaunchAgent that starts it at login and restarts it if it crashes or is killed
 
 Escape hides, Cmd+Q (while the panel is up) quits.
 
