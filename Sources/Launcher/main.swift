@@ -32,7 +32,7 @@ import Carbon
             MainActor.assumeIsolated {
                 let me = NSApp.delegate as! AppDelegate
                 if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { me.tap.map { CGEvent.tapEnable(tap: $0, enable: true) } }
-                else if me.doubleTap.feed(type, event) { me.panel.toggle(ai: true) }
+                else if me.doubleTap.feed(type, event) { Switchboard.show() }
             }
             return .passUnretained(event)
         }, userInfo: nil)

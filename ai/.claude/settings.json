@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": { "ponytail@ponytail": false },
+  "hooks": {
+    "Stop": [{ "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/speak" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "killall say 2>/dev/null; true" }] }]
+  }
+}

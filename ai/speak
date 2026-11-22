@@ -1,0 +1,5 @@
+#!/bin/bash
+# Stop hook: say the switchboard's reply aloud. Detached so the next prompt isn't held up; UserPromptSubmit kills it.
+msg=$(jq -r '.last_assistant_message // empty')
+[[ -n $msg ]] && nohup say -- "$msg" >/dev/null 2>&1 &
+exit 0

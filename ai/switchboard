@@ -1,0 +1,10 @@
+#!/bin/bash
+# Double-tap Cmd: bring Rex forward on the switchboard session, starting it in this folder if it isn't running.
+set -euo pipefail
+# Launcher runs under launchd's bare PATH; Rex only adds its CLI to PATH inside its own terminals
+export PATH="$HOME/Library/Application Support/com.superlogical.rex/RexServer/Versions/Current/Rex Server.app/Contents/MacOS:$PATH"
+cd "$(dirname "$0")"
+open -b com.superlogical.rex
+id=$(rex ls --json | jq -r '[.sessions[] | select(.label == "switchboard")][0].session_id // empty')
+[[ -n $id ]] || id=$(rex new switchboard -c "$PWD" --json -- claude -n switchboard --model sonnet | jq -er .session_id)
+rex do session.select session_id="$id"
