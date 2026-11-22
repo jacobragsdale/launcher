@@ -4,6 +4,8 @@ BIN = .build/release/Launcher
 OPEN = env -u HC_SCOPE -u HC_TERMINAL_ID -u HC_TERMINAL_SOCKET open
 AGENT = $(HOME)/Library/LaunchAgents/dev.jacob.launcher.plist
 SERVICE = gui/$(shell id -u)/dev.jacob.launcher
+TTS_AGENT = $(HOME)/Library/LaunchAgents/dev.jacob.tts.plist
+TTS_SERVICE = gui/$(shell id -u)/dev.jacob.tts
 
 all: $(APP)
 
@@ -32,6 +34,9 @@ install: $(APP)
 	cp -R $(APP) /Applications/
 	cp dev.jacob.launcher.plist $(AGENT)
 	launchctl bootstrap gui/$(shell id -u) $(AGENT)
+	launchctl bootout $(TTS_SERVICE) 2>/dev/null || true
+	cp dev.jacob.tts.plist $(TTS_AGENT)
+	launchctl bootstrap gui/$(shell id -u) $(TTS_AGENT)
 
 test:
 	swift test

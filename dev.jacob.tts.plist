@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- make install puts this in ~/Library/LaunchAgents: Kokoro text-to-speech for the switchboard's voice (ai/speak), on
+     localhost:8765, kept loaded so a reply takes ~0.3s instead of ~4s. About 550 MB resident. -->
+<plist version="1.0"><dict>
+	<key>Label</key><string>dev.jacob.tts</string>
+	<key>ProgramArguments</key><array>
+		<string>/Users/jacob/.local/bin/uvx</string>
+		<string>--from</string><string>mlx-audio[server]==0.6.7</string>
+		<string>--with</string><string>misaki[en]==0.9.4</string>
+		<string>--with</string><string>pip</string> <!-- misaki fetches a spaCy model with pip on first use -->
+		<string>mlx_audio.server</string><string>--host</string><string>127.0.0.1</string><string>--port</string><string>8765</string>
+		<string>--log-dir</string><string>/tmp/dev.jacob.tts</string> <!-- it writes logs/ in the working directory, which is / under launchd -->
+	</array>
+	<key>RunAtLoad</key><true/>
+	<key>KeepAlive</key><true/>
+	<key>LimitLoadToSessionType</key><string>Aqua</string>
+	<key>StandardErrorPath</key><string>/tmp/dev.jacob.tts.log</string>
+</dict></plist>

@@ -1,5 +1,15 @@
 #!/bin/bash
-# Stop hook: say the switchboard's reply aloud. Detached so the next prompt isn't held up; UserPromptSubmit kills it.
+# Stop hook: say the switchboard's reply aloud in Kokoro's voice (dev.jacob.tts on localhost:8765), or with macOS `say`
+# when that server is down. Detached so the next prompt isn't held up; UserPromptSubmit kills it.
+voice=af_heart # others: am_michael, bf_emma, bm_george, … (Kokoro-82M's voice list)
 msg=$(jq -r '.last_assistant_message // empty')
-[[ -n $msg ]] && nohup say -- "$msg" >/dev/null 2>&1 &
+[[ -n $msg ]] || exit 0
+(
+    trap '' HUP
+    f=$(mktemp)
+    if curl -fsS -m 20 -o "$f" http://127.0.0.1:8765/v1/audio/speech -H 'Content-Type: application/json' \
+        -d "$(jq -n --arg t "$msg" --arg v "$voice" '{model: "mlx-community/Kokoro-82M-bf16", voice: $v, input: $t, response_format: "wav"}')"
+    then afplay "$f"; else say -- "$msg"; fi
+    rm -f "$f"
+) >/dev/null 2>&1 &
 exit 0
